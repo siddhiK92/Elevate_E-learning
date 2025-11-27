@@ -4,9 +4,6 @@ pipeline {
             yaml '''
 apiVersion: v1
 kind: Pod
-metadata:
-  labels:
-    jenkins/label: "2401093-elearning-siddhi"
 spec:
   restartPolicy: Never
   volumes:
@@ -34,7 +31,7 @@ spec:
           mountPath: /home/jenkins/agent
 
     - name: kubectl
-      image: bitnami/kubectl
+      image: bitnami/kubectl:latest
       tty: true
       command: ["cat"]
       env:
@@ -69,11 +66,6 @@ spec:
 
         NEXUS_USER = 'admin'
         NEXUS_PASS = 'Changeme@2025'
-
-        // ✅ CORRECT Sonar Config
-        SONAR_PROJECT_KEY = '2401093-e-learning'
-        SONAR_HOST_URL    = 'http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000'
-        SONAR_PROJECT_TOKEN = 'PUT_YOUR_REAL_TOKEN_HERE'
     }
 
     stages {
@@ -95,7 +87,9 @@ spec:
             steps {
                 container('node') {
                     dir('server') {
-                        sh 'npm install'
+                        sh '''
+                        npm install
+                        '''
                     }
                 }
             }
@@ -105,7 +99,7 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                    while ! docker info > /dev/null 2>&1; do sleep 2; done
+                    while ! docker info > /dev/null 2>&1; do sleep 3; done
 
                     docker build -t ${CLIENT_IMAGE}:${IMAGE_TAG} ./client
                     docker build -t ${SERVER_IMAGE}:${IMAGE_TAG} ./server
@@ -114,16 +108,13 @@ spec:
             }
         }
 
-        stage('SonarQube Scan ✅ FIXED') {
+        // ✅ CLEAN FIXED SONAR STAGE
+        stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
-                    sh """
-                    sonar-scanner \
-                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                    -Dsonar.sources=. \
-                    -Dsonar.host.url=${SONAR_HOST_URL} \
-                    -Dsonar.token=${SONAR_PROJECT_TOKEN}
-                    """
+                    sh '''
+                    sonar-scanner
+                    '''
                 }
             }
         }
@@ -138,7 +129,7 @@ spec:
             }
         }
 
-        stage('Push Docker Images') {
+        stage('Push Images') {
             steps {
                 container('dind') {
                     sh '''
@@ -168,10 +159,10 @@ spec:
 
     post {
         success {
-            echo "✅ Pipeline completed successfully for Siddhi (2401093)"
+            echo "✅ CI/CD Pipeline completed successfully for Siddhi (2401093 - E-Learning)"
         }
         failure {
-            echo "❌ Pipeline failed. Check logs."
+            echo "❌ CI/CD Pipeline failed."
         }
     }
 }
