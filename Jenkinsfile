@@ -79,21 +79,20 @@ spec:
 
         // Nexus Registry Details
         REGISTRY   = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
-        APP_NAME   = 'E-Learning'
         IMAGE_TAG  = 'latest'
 
-        // Images will be stored under your roll no. path
-        CLIENT_IMAGE = "${REGISTRY}/2401093/${APP_NAME}-client"
-        SERVER_IMAGE = "${REGISTRY}/2401093/${APP_NAME}-server"
+        // 🔴 IMPORTANT: image names MUST be lowercase
+        CLIENT_IMAGE = "${REGISTRY}/2401093/e-learning-client"
+        SERVER_IMAGE = "${REGISTRY}/2401093/e-learning-server"
 
         // Nexus Credentials
         NEXUS_USER = 'admin'
         NEXUS_PASS = 'Changeme@2025'
 
-        // SonarQube Configuration (edit token if needed)
-        SONAR_PROJECT_KEY   = '2401093-E-Learning'
-        SONAR_HOST_URL      = 'http://sonarqube.imcc.com'   // change if your teacher gave different URL
-        SONAR_PROJECT_TOKEN = 'sqp_f8d55bdd4bd260e26fa5436d1a950d8b08253fbe' // put YOUR token here
+        // SonarQube Configuration (put your real token!)
+        SONAR_PROJECT_KEY   = '2401093-e-learning'
+        SONAR_HOST_URL      = 'http://sonarqube.imcc.com'
+        SONAR_PROJECT_TOKEN = 'PASTE_YOUR_SONAR_TOKEN_HERE'
     }
 
     stages {
@@ -159,10 +158,10 @@ spec:
                 container('sonar-scanner') {
                     sh """
                     sonar-scanner \
-                      -Dsonar.projectKey=2401093 \
+                      -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                       -Dsonar.sources=. \
-                      -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                      -Dsonar.login=sqp_f8d55bdd4bd260e26fa5436d1a950d8b08253fbe
+                      -Dsonar.host.url=${SONAR_HOST_URL} \
+                      -Dsonar.login=${SONAR_PROJECT_TOKEN}
                     """
                 }
             }
@@ -213,7 +212,7 @@ spec:
 
     post {
         success {
-            echo "✅ Pipeline completed successfully for Siddhi (2401093 - E-Learning)!"
+            echo "✅ Pipeline completed successfully for Siddhi (2401093 - e-learning)!"
         }
         failure {
             echo "❌ Pipeline failed. Check logs for details."
