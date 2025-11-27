@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  server:
+    build: ./server
+    container_name: siddhi-lms-server
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./server/.env
+    volumes:
+      - ./server/uploads:/app/uploads
+
+  client:
+    build: ./client
+    container_name: siddhi-lms-client
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
