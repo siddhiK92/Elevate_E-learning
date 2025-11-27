@@ -9,14 +9,13 @@ metadata:
     jenkins/label: "2401093-elearning-siddhi"
 spec:
   restartPolicy: Never
-  nodeSelector:
-    kubernetes.io/os: "linux"
   volumes:
     - name: workspace-volume
       emptyDir: {}
     - name: kubeconfig-secret
       secret:
         secretName: kubeconfig-secret
+
   containers:
     - name: node
       image: node:18
@@ -25,6 +24,7 @@ spec:
       volumeMounts:
         - name: workspace-volume
           mountPath: /home/jenkins/agent
+
     - name: sonar-scanner
       image: sonarsource/sonar-scanner-cli
       tty: true
@@ -32,40 +32,25 @@ spec:
       volumeMounts:
         - name: workspace-volume
           mountPath: /home/jenkins/agent
+
     - name: kubectl
-      image: bitnami/kubectl:latest
+      image: bitnami/kubectl
       tty: true
       command: ["cat"]
       env:
         - name: KUBECONFIG
           value: /kube/config
-      securityContext:
-        runAsUser: 0
       volumeMounts:
         - name: kubeconfig-secret
           mountPath: /kube/config
           subPath: kubeconfig
         - name: workspace-volume
           mountPath: /home/jenkins/agent
+
     - name: dind
       image: docker:dind
-      args: ["--storage-driver=overlay2", "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"]
       securityContext:
         privileged: true
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
-    - name: jnlp
-      image: jenkins/inbound-agent:3345.v03dee9b_f88fc-1
-      env:
-        - name: JENKINS_AGENT_NAME
-          value: "2401093-elearning-siddhi-agent"
-        - name: JENKINS_AGENT_WORKDIR
-          value: "/home/jenkins/agent"
-      resources:
-        requests:
-          cpu: "100m"
-          memory: "256Mi"
       volumeMounts:
         - name: workspace-volume
           mountPath: /home/jenkins/agent
@@ -74,37 +59,31 @@ spec:
     }
 
     environment {
-        // --- CONFIGURATION FOR SIDDHI (2401093) ---
-        NAMESPACE  = '2401093'
+        NAMESPACE = '2401093'
 
-        // Nexus Registry Details
-        REGISTRY   = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
-        IMAGE_TAG  = 'latest'
+        REGISTRY  = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
+        IMAGE_TAG = 'latest'
 
-        // 🔴 IMPORTANT: image names MUST be lowercase
         CLIENT_IMAGE = "${REGISTRY}/2401093/e-learning-client"
         SERVER_IMAGE = "${REGISTRY}/2401093/e-learning-server"
 
-        // Nexus Credentials
         NEXUS_USER = 'admin'
         NEXUS_PASS = 'Changeme@2025'
 
-        // SonarQube Configuration (put your real token!)
-        SONAR_PROJECT_KEY   = '2401093-e-learning'
-        SONAR_HOST_URL      = 'http://sonarqube.imcc.com'
-        SONAR_PROJECT_TOKEN = 'PASTE_YOUR_SONAR_TOKEN_HERE'
+        // ✅ CORRECT Sonar Config
+        SONAR_PROJECT_KEY = '2401093-e-learning'
+        SONAR_HOST_URL    = 'http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000'
+        SONAR_PROJECT_TOKEN = 'PUT_YOUR_REAL_TOKEN_HERE'
     }
 
     stages {
 
-        stage('Install + Build Frontend') {
+        stage('Frontend Build') {
             steps {
                 container('node') {
                     dir('client') {
                         sh '''
-                        echo "📦 Installing Client Dependencies..."
                         npm install
-                        echo "🏗️ Building React App..."
                         npm run build
                         '''
                     }
@@ -112,77 +91,57 @@ spec:
             }
         }
 
-        stage('Install Backend') {
+        stage('Backend Install') {
             steps {
                 container('node') {
                     dir('server') {
-                        sh '''
-                        echo "📦 Installing Server Dependencies..."
-                        npm install
-                        '''
+                        sh 'npm install'
                     }
                 }
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Docker Build') {
             steps {
                 container('dind') {
-                    script {
-                        echo "🔧 Switching base images to AWS Public Registry..."
-                        sh "sed -i 's|FROM node|FROM public.ecr.aws/docker/library/node|g' ./client/Dockerfile"
-                        sh "sed -i 's|FROM node|FROM public.ecr.aws/docker/library/node|g' ./server/Dockerfile"
-                        sh "sed -i 's|FROM nginx|FROM public.ecr.aws/docker/library/nginx|g' ./client/Dockerfile"
+                    sh '''
+                    while ! docker info > /dev/null 2>&1; do sleep 2; done
 
-                        sh "sed -i 's|FROM ${REGISTRY}/node|FROM public.ecr.aws/docker/library/node|g' ./client/Dockerfile"
-                        sh "sed -i 's|FROM ${REGISTRY}/nginx|FROM public.ecr.aws/docker/library/nginx|g' ./client/Dockerfile"
-                        sh "sed -i 's|FROM ${REGISTRY}/node|FROM public.ecr.aws/docker/library/node|g' ./server/Dockerfile"
-
-                        sh '''
-                        # Wait for Docker Daemon
-                        while ! docker info > /dev/null 2>&1; do echo "Waiting for Docker..."; sleep 3; done
-
-                        echo "🐳 Building Client Image..."
-                        docker build -t ${CLIENT_IMAGE}:${IMAGE_TAG} ./client
-
-                        echo "🐳 Building Server Image..."
-                        docker build -t ${SERVER_IMAGE}:${IMAGE_TAG} ./server
-                        '''
-                    }
+                    docker build -t ${CLIENT_IMAGE}:${IMAGE_TAG} ./client
+                    docker build -t ${SERVER_IMAGE}:${IMAGE_TAG} ./server
+                    '''
                 }
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('SonarQube Scan ✅ FIXED') {
             steps {
                 container('sonar-scanner') {
                     sh """
                     sonar-scanner \
-                      -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                      -Dsonar.sources=. \
-                      -Dsonar.host.url=${SONAR_HOST_URL} \
-                      -Dsonar.login=${SONAR_PROJECT_TOKEN}
+                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                    -Dsonar.sources=. \
+                    -Dsonar.host.url=${SONAR_HOST_URL} \
+                    -Dsonar.token=${SONAR_PROJECT_TOKEN}
                     """
                 }
             }
         }
 
-        stage('Login to Nexus Registry') {
-            steps {
-                container('dind') {
-                    sh """
-                    echo "🔐 Logging into Nexus Docker Registry..."
-                    echo "$NEXUS_PASS" | docker login ${REGISTRY} -u "$NEXUS_USER" --password-stdin
-                    """
-                }
-            }
-        }
-
-        stage('Push to Nexus') {
+        stage('Login to Nexus') {
             steps {
                 container('dind') {
                     sh '''
-                    echo "🚀 Pushing images to Nexus..."
+                    echo "$NEXUS_PASS" | docker login ${REGISTRY} -u "$NEXUS_USER" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Push Docker Images') {
+            steps {
+                container('dind') {
+                    sh '''
                     docker push ${CLIENT_IMAGE}:${IMAGE_TAG}
                     docker push ${SERVER_IMAGE}:${IMAGE_TAG}
                     '''
@@ -194,15 +153,12 @@ spec:
             steps {
                 container('kubectl') {
                     sh """
-                    echo "📦 Applying Kubernetes manifests..."
                     kubectl apply -f k8s-deployment.yaml -n ${NAMESPACE}
                     kubectl apply -f client-service.yaml -n ${NAMESPACE}
 
-                    echo "🔁 Updating images in deployments..."
                     kubectl set image deployment/client-deployment client=${CLIENT_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
                     kubectl set image deployment/server-deployment server=${SERVER_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
 
-                    echo "✅ Checking rollout status..."
                     kubectl rollout status deployment/server-deployment -n ${NAMESPACE}
                     """
                 }
@@ -212,10 +168,10 @@ spec:
 
     post {
         success {
-            echo "✅ Pipeline completed successfully for Siddhi (2401093 - e-learning)!"
+            echo "✅ Pipeline completed successfully for Siddhi (2401093)"
         }
         failure {
-            echo "❌ Pipeline failed. Check logs for details."
+            echo "❌ Pipeline failed. Check logs."
         }
     }
 }
