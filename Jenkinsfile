@@ -60,7 +60,7 @@ spec:
 
         SONAR_PROJECT_KEY   = '2401093_elearning'
         SONAR_HOST_URL      = 'http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000'
-        SONAR_PROJECT_TOKEN = 'sqp_f8d55bdd4bd260e26fa5436d1a950d8b08253fbe'
+        SONAR_PROJECT_TOKEN = 'sqp_676d31d11866c267740429895840cd4241fa96a2'
     }
 
     stages {
