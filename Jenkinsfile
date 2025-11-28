@@ -1,4 +1,4 @@
-jenkins file                                                                                                                                                  pipeline {
+pipeline {
     agent {
         kubernetes {
             yaml '''
@@ -93,10 +93,10 @@ spec:
         stage('Build Images') {
             steps {
                 container('dind') {
-                    sh '''
+                    sh """
                     docker build -t ${CLIENT_IMAGE}:${IMAGE_TAG} ./client
                     docker build -t ${SERVER_IMAGE}:${IMAGE_TAG} ./server
-                    '''
+                    """
                 }
             }
         }
@@ -117,11 +117,11 @@ spec:
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
-                    sh '''
+                    sh """
                     kubectl apply -f k8s-deployment.yaml -n ${NAMESPACE}
                     kubectl set image deployment/server-deployment server=${SERVER_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
                     kubectl set image deployment/client-deployment client=${CLIENT_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
-                    '''
+                    """
                 }
             }
         }
