@@ -1,48 +1,51 @@
-pipeline {
+jenkins file                                                                                                                                                  pipeline {
     agent {
         kubernetes {
             yaml '''
 apiVersion: v1
 kind: Pod
+metadata:
+  labels:
+    jenkins/label: "2401093-elearning-siddhi"
 spec:
+  restartPolicy: Never
   volumes:
-  - name: workspace-volume
-    emptyDir: {}
-
+    - name: workspace-volume
+      emptyDir: {}
   containers:
-  - name: node
-    image: node:18
-    command: ["/bin/sh", "-c"]
-    args: ["sleep 999999"]
-    volumeMounts:
-      - name: workspace-volume
-        mountPath: /home/jenkins/agent
+    - name: node
+      image: node:18
+      tty: true
+      command: ["cat"]
+      volumeMounts:
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
 
-  - name: sonar-scanner
-    image: sonarsource/sonar-scanner-cli
-    command: ["/bin/sh", "-c"]
-    args: ["sleep 999999"]
-    volumeMounts:
-      - name: workspace-volume
-        mountPath: /home/jenkins/agent
+    - name: sonar-scanner
+      image: sonarsource/sonar-scanner-cli
+      tty: true
+      command: ["cat"]
+      volumeMounts:
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
 
-  - name: kubectl
-    image: bitnami/kubectl:latest
-    command: ["/bin/sh", "-c"]
-    args: ["sleep 999999"]
-    volumeMounts:
-      - name: workspace-volume
-        mountPath: /home/jenkins/agent
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      tty: true
+      command: ["cat"]
+      volumeMounts:
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
 
-  - name: dind
-    image: docker:dind
-    securityContext:
-      privileged: true
-    command: ["/bin/sh", "-c"]
-    args: ["dockerd-entrypoint.sh"]
-    volumeMounts:
-      - name: workspace-volume
-        mountPath: /home/jenkins/agent
+    - name: dind
+      image: docker:dind
+      tty: true
+      securityContext:
+        privileged: true
+      command: ["dockerd"]
+      volumeMounts:
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
 '''
         }
     }
@@ -56,7 +59,7 @@ spec:
         SERVER_IMAGE = "${REGISTRY}/2401093/e-learning-server"
 
         SONAR_PROJECT_KEY   = '2401093_siddhiKawade_LMS'
-        SONAR_HOST_URL      = 'http://sonarqube.imcc.com'
+        SONAR_HOST_URL      = 'http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000'
         SONAR_PROJECT_TOKEN = 'sqp_676d31d11866c267740429895840cd4241fa96a2'
     }
 
@@ -65,11 +68,12 @@ spec:
         stage('Build Frontend') {
             steps {
                 container('node') {
-                    sh '''
-                    cd client
-                    npm install
-                    npm run build
-                    '''
+                    dir('client') {
+                        sh '''
+                        npm install
+                        npm run build
+                        '''
+                    }
                 }
             }
         }
@@ -77,15 +81,16 @@ spec:
         stage('Build Backend') {
             steps {
                 container('node') {
-                    sh '''
-                    cd server
-                    npm install
-                    '''
+                    dir('server') {
+                        sh '''
+                        npm install
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Build Images') {
             steps {
                 container('dind') {
                     sh '''
@@ -99,14 +104,12 @@ spec:
         stage('SonarQube Scan') {
             steps {
                 container('sonar-scanner') {
-                    sh '''
+                    sh """
                     sonar-scanner \
                     -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                    -Dsonar.sources=. \
-                    -Dsonar.exclusions=**/node_modules/**,**/build/**,**/dist/** \
                     -Dsonar.host.url=${SONAR_HOST_URL} \
-                    -Dsonar.login=${SONAR_PROJECT_TOKEN}
-                    '''
+                    -Dsonar.token=${SONAR_PROJECT_TOKEN}
+                    """
                 }
             }
         }
@@ -129,7 +132,7 @@ spec:
             echo "✅ CI/CD Pipeline completed successfully!"
         }
         failure {
-            echo "❌ Pipeline failed! Check logs above."
+            echo "❌ Pipeline failed!"
         }
     }
 }
