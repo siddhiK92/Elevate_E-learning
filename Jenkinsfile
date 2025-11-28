@@ -10,33 +10,21 @@ metadata:
     jenkins/label: "2401093-elearning-siddhi"
 spec:
   restartPolicy: Never
-  volumes:
-    - name: workspace-volume
-      emptyDir: {}
   containers:
     - name: node
       image: node:18
       tty: true
       command: ["cat"]
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
 
     - name: sonar-scanner
       image: sonarsource/sonar-scanner-cli
       tty: true
       command: ["cat"]
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
 
     - name: kubectl
       image: bitnami/kubectl:latest
       tty: true
       command: ["cat"]
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
 
     - name: dind
       image: docker:dind
@@ -44,9 +32,6 @@ spec:
       securityContext:
         privileged: true
       command: ["dockerd"]
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
 """
         }
     }
@@ -109,6 +94,7 @@ spec:
             steps {
                 container('dind') {
                     sh """
+                    echo '--- Docker Info ---'
                     docker version || echo 'Docker daemon not ready yet'
                     docker build -t ${CLIENT_IMAGE}:${IMAGE_TAG} ./client
                     docker build -t ${SERVER_IMAGE}:${IMAGE_TAG} ./server
