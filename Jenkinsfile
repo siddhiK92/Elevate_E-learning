@@ -108,7 +108,6 @@ spec:
             }
         }
 
-        // ✅ CLEAN FIXED SONAR STAGE
         stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
@@ -159,10 +158,10 @@ spec:
 
     post {
         success {
-            echo "✅ CI/CD Pipeline completed successfully for Siddhi (2401093 - E-Learning)"
+            echo "✅ Pipeline completed successfully for Siddhi (2401093)"
         }
         failure {
-            echo "❌ CI/CD Pipeline failed."
+            echo "❌ Pipeline failed. Check logs."
         }
     }
 }
