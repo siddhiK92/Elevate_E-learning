@@ -58,7 +58,7 @@ spec:
         CLIENT_IMAGE = "${REGISTRY}/2401093/e-learning-client"
         SERVER_IMAGE = "${REGISTRY}/2401093/e-learning-server"
 
-        SONAR_PROJECT_KEY   = '2401093_elearning'
+        SONAR_PROJECT_KEY   = '2401093_siddhiKawade_LMS'
         SONAR_HOST_URL      = 'http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000'
         SONAR_PROJECT_TOKEN = 'sqp_676d31d11866c267740429895840cd4241fa96a2'
     }
