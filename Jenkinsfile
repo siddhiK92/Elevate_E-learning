@@ -57,7 +57,6 @@ spec:
 
     environment {
         NAMESPACE = '2401093'
-
         REGISTRY  = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
         IMAGE_TAG = 'latest'
 
@@ -100,7 +99,6 @@ spec:
                 container('dind') {
                     sh '''
                     while ! docker info > /dev/null 2>&1; do sleep 3; done
-
                     docker build -t ${CLIENT_IMAGE}:${IMAGE_TAG} ./client
                     docker build -t ${SERVER_IMAGE}:${IMAGE_TAG} ./server
                     '''
@@ -108,15 +106,25 @@ spec:
             }
         }
 
+        // --- UPDATED STAGE START ---
         stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
+                    // We pass the properties directly here to avoid file issues
                     sh '''
-                    sonar-scanner
+                    sonar-scanner \
+                    -Dsonar.projectKey=2401093_E-Learning \
+                    -Dsonar.projectName=2401093_E-Learning \
+                    -Dsonar.projectVersion=1.0 \
+                    -Dsonar.sources=. \
+                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/** \
+                    -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                    -Dsonar.token=sqp_f8d55bdd4bd260e26fa5436d1a950d8b08253fbe
                     '''
                 }
             }
         }
+        // --- UPDATED STAGE END ---
 
         stage('Login to Nexus') {
             steps {
@@ -158,7 +166,7 @@ spec:
 
     post {
         success {
-            echo "✅ Pipeline completed successfully for Siddhi (2401093 E-Learning, Sonar key 2401093_elearning)"
+            echo "✅ Pipeline completed successfully for Siddhi (2401093 E-Learning)"
         }
         failure {
             echo "❌ Pipeline failed. Check logs."
