@@ -158,7 +158,7 @@ spec:
 
     post {
         success {
-            echo "✅ Pipeline completed successfully for Siddhi (2401093)"
+            echo "✅ Pipeline completed successfully for Siddhi (2401093 E-Learning, Sonar key 2401093_elearning)"
         }
         failure {
             echo "❌ Pipeline failed. Check logs."
