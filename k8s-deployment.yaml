@@ -1,15 +1,10 @@
-# -----------------------------------------------------
-# 1. NAMESPACE
-# -----------------------------------------------------
 apiVersion: v1
 kind: Namespace
 metadata:
   name: "2401093"
 
 ---
-# -----------------------------------------------------
-# 2. MONGODB STORAGE (PVC)
-# -----------------------------------------------------
+
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -23,9 +18,7 @@ spec:
       storage: 1Gi
 
 ---
-# -----------------------------------------------------
-# 3. MONGODB DEPLOYMENT
-# -----------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -55,27 +48,7 @@ spec:
           claimName: mongo-pvc
 
 ---
-# -----------------------------------------------------
-# 4. MONGODB SERVICE
-# -----------------------------------------------------
-apiVersion: v1
-kind: Service
-metadata:
-  name: mongo-service
-  namespace: "2401093"
-spec:
-  selector:
-    app: mongo
-  ports:
-    - protocol: TCP
-      port: 27017
-      targetPort: 27017
-  type: ClusterIP
 
----
-# -----------------------------------------------------
-# 5. SERVER (BACKEND) DEPLOYMENT
-# -----------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -91,41 +64,17 @@ spec:
       labels:
         app: server
     spec:
-      imagePullSecrets:
-        - name: nexus-secret
       containers:
       - name: server
-        image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401157/jobfit-server:v1
+        image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401093/e-learning-server:latest
         ports:
         - containerPort: 5000
         env:
         - name: MONGO_URL
-          value: "mongodb://mongo-service:27017/jobfit"
-        - name: PORT
-          value: "5000"
+          value: mongodb://mongo-service:27017/elearning
 
 ---
-# -----------------------------------------------------
-# 6. SERVER SERVICE
-# -----------------------------------------------------
-apiVersion: v1
-kind: Service
-metadata:
-  name: server-service
-  namespace: "2401093"
-spec:
-  selector:
-    app: server
-  ports:
-    - protocol: TCP
-      port: 5000
-      targetPort: 5000
-  type: ClusterIP
 
----
-# -----------------------------------------------------
-# 7. CLIENT (FRONTEND) DEPLOYMENT
-# -----------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -141,18 +90,29 @@ spec:
       labels:
         app: client
     spec:
-      imagePullSecrets:
-        - name: nexus-secret
       containers:
       - name: client
-        image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401157/jobfit-client:v1
+        image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401093/e-learning-client:latest
         ports:
         - containerPort: 80
 
 ---
-# -----------------------------------------------------
-# 8. CLIENT SERVICE (EXPOSE FRONTEND)
-# -----------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: server-service
+  namespace: "2401093"
+spec:
+  selector:
+    app: server
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP
+
+---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -162,7 +122,6 @@ spec:
   selector:
     app: client
   ports:
-    - protocol: TCP
-      port: 80
+    - port: 80
       targetPort: 80
   type: LoadBalancer

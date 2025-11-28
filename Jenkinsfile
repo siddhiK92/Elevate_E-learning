@@ -4,15 +4,14 @@ pipeline {
             yaml '''
 apiVersion: v1
 kind: Pod
+metadata:
+  labels:
+    jenkins/label: "2401093-elearning-siddhi"
 spec:
   restartPolicy: Never
   volumes:
     - name: workspace-volume
       emptyDir: {}
-    - name: kubeconfig-secret
-      secret:
-        secretName: kubeconfig-secret
-
   containers:
     - name: node
       image: node:18
@@ -34,20 +33,16 @@ spec:
       image: bitnami/kubectl:latest
       tty: true
       command: ["cat"]
-      env:
-        - name: KUBECONFIG
-          value: /kube/config
       volumeMounts:
-        - name: kubeconfig-secret
-          mountPath: /kube/config
-          subPath: kubeconfig
         - name: workspace-volume
           mountPath: /home/jenkins/agent
 
     - name: dind
       image: docker:dind
+      tty: true
       securityContext:
         privileged: true
+      command: ["dockerd"]
       volumeMounts:
         - name: workspace-volume
           mountPath: /home/jenkins/agent
@@ -56,20 +51,21 @@ spec:
     }
 
     environment {
-        NAMESPACE = '2401093'
-        REGISTRY  = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
-        IMAGE_TAG = 'latest'
+        NAMESPACE  = '2401093'
+        REGISTRY   = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
+        IMAGE_TAG  = 'latest'
 
         CLIENT_IMAGE = "${REGISTRY}/2401093/e-learning-client"
         SERVER_IMAGE = "${REGISTRY}/2401093/e-learning-server"
 
-        NEXUS_USER = 'admin'
-        NEXUS_PASS = 'Changeme@2025'
+        SONAR_PROJECT_KEY   = '2401093_elearning'
+        SONAR_HOST_URL      = 'http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000'
+        SONAR_PROJECT_TOKEN = 'sqp_f8d55bdd4bd260e26fa5436d1a950d8b08253fbe'
     }
 
     stages {
 
-        stage('Frontend Build') {
+        stage('Build Frontend') {
             steps {
                 container('node') {
                     dir('client') {
@@ -82,7 +78,7 @@ spec:
             }
         }
 
-        stage('Backend Install') {
+        stage('Build Backend') {
             steps {
                 container('node') {
                     dir('server') {
@@ -94,11 +90,10 @@ spec:
             }
         }
 
-        stage('Docker Build') {
+        stage('Build Images') {
             steps {
                 container('dind') {
                     sh '''
-                    while ! docker info > /dev/null 2>&1; do sleep 3; done
                     docker build -t ${CLIENT_IMAGE}:${IMAGE_TAG} ./client
                     docker build -t ${SERVER_IMAGE}:${IMAGE_TAG} ./server
                     '''
@@ -106,43 +101,15 @@ spec:
             }
         }
 
-        // --- UPDATED STAGE START ---
-        stage('SonarQube Analysis') {
+        stage('SonarQube Scan') {
             steps {
                 container('sonar-scanner') {
-                    // We pass the properties directly here to avoid file issues
-                    sh '''
+                    sh """
                     sonar-scanner \
-                    -Dsonar.projectKey=2401093_E-Learning \
-                    -Dsonar.projectName=2401093_E-Learning \
-                    -Dsonar.projectVersion=1.0 \
-                    -Dsonar.sources=. \
-                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/** \
-                    -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                    -Dsonar.token=sqp_f8d55bdd4bd260e26fa5436d1a950d8b08253fbe
-                    '''
-                }
-            }
-        }
-        // --- UPDATED STAGE END ---
-
-        stage('Login to Nexus') {
-            steps {
-                container('dind') {
-                    sh '''
-                    echo "$NEXUS_PASS" | docker login ${REGISTRY} -u "$NEXUS_USER" --password-stdin
-                    '''
-                }
-            }
-        }
-
-        stage('Push Images') {
-            steps {
-                container('dind') {
-                    sh '''
-                    docker push ${CLIENT_IMAGE}:${IMAGE_TAG}
-                    docker push ${SERVER_IMAGE}:${IMAGE_TAG}
-                    '''
+                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                    -Dsonar.host.url=${SONAR_HOST_URL} \
+                    -Dsonar.token=${SONAR_PROJECT_TOKEN}
+                    """
                 }
             }
         }
@@ -150,15 +117,11 @@ spec:
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
-                    sh """
+                    sh '''
                     kubectl apply -f k8s-deployment.yaml -n ${NAMESPACE}
-                    kubectl apply -f client-service.yaml -n ${NAMESPACE}
-
-                    kubectl set image deployment/client-deployment client=${CLIENT_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
                     kubectl set image deployment/server-deployment server=${SERVER_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
-
-                    kubectl rollout status deployment/server-deployment -n ${NAMESPACE}
-                    """
+                    kubectl set image deployment/client-deployment client=${CLIENT_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
+                    '''
                 }
             }
         }
@@ -166,10 +129,10 @@ spec:
 
     post {
         success {
-            echo "✅ Pipeline completed successfully for Siddhi (2401093 E-Learning)"
+            echo "✅ CI/CD Pipeline completed successfully!"
         }
         failure {
-            echo "❌ Pipeline failed. Check logs."
+            echo "❌ Pipeline failed!"
         }
     }
 }
