@@ -1,7 +1,8 @@
 pipeline {
     agent {
         kubernetes {
-            yaml '''
+            label '2401093-elearning-siddhi'
+            yaml """
 apiVersion: v1
 kind: Pod
 metadata:
@@ -46,7 +47,7 @@ spec:
       volumeMounts:
         - name: workspace-volume
           mountPath: /home/jenkins/agent
-'''
+"""
         }
     }
 
@@ -65,14 +66,28 @@ spec:
 
     stages {
 
+        stage('Debug Workspace') {
+            steps {
+                container('node') {
+                    sh """
+                    echo '--- Debug Workspace ---'
+                    echo 'User:' \$(id)
+                    echo 'PWD :' \$(pwd)
+                    echo 'Listing workspace:'
+                    ls -R
+                    """
+                }
+            }
+        }
+
         stage('Build Frontend') {
             steps {
                 container('node') {
                     dir('client') {
-                        sh '''
+                        sh """
                         npm install
                         npm run build
-                        '''
+                        """
                     }
                 }
             }
@@ -82,9 +97,9 @@ spec:
             steps {
                 container('node') {
                     dir('server') {
-                        sh '''
+                        sh """
                         npm install
-                        '''
+                        """
                     }
                 }
             }
@@ -94,6 +109,7 @@ spec:
             steps {
                 container('dind') {
                     sh """
+                    docker version || echo 'Docker daemon not ready yet'
                     docker build -t ${CLIENT_IMAGE}:${IMAGE_TAG} ./client
                     docker build -t ${SERVER_IMAGE}:${IMAGE_TAG} ./server
                     """
@@ -106,9 +122,9 @@ spec:
                 container('sonar-scanner') {
                     sh """
                     sonar-scanner \
-                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                    -Dsonar.host.url=${SONAR_HOST_URL} \
-                    -Dsonar.token=${SONAR_PROJECT_TOKEN}
+                      -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                      -Dsonar.host.url=${SONAR_HOST_URL} \
+                      -Dsonar.token=${SONAR_PROJECT_TOKEN}
                     """
                 }
             }
